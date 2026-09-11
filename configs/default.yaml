@@ -1,0 +1,25 @@
+model:
+  base_url_env: OPENAI_BASE_URL
+  api_key_env: OPENAI_API_KEY
+  model_env: UER_RAG_MODEL
+  temperature: 0
+  timeout_seconds: 120
+
+retrieval:
+  elasticsearch_url_env: ELASTICSEARCH_URL
+  index_env: UER_RAG_INDEX
+  title_field: title
+  text_field: text
+  retrieve_k: 50
+  top_k: 3
+  rrf_k: 20
+  request_timeout_seconds: 60
+
+verification:
+  support_allowed: [high, medium]
+  utility_required: helpful
+  max_reason_chars: 320
+
+run:
+  allow_rescue: true
+  flush_every: 1

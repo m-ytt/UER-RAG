@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use UER-RAG, please cite the accompanying manuscript."
+title: "UER-RAG: Unified Entity-Relation Adaptive RAG"
+type: software
+version: 1.0.0
+date-released: 2026-09-11
+authors:
+  - family-names: "Anonymous"
+    given-names: "Author"
+repository-code: "https://github.com/OWNER/UER-RAG"
+license: MIT
