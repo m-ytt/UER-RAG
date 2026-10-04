@@ -44,3 +44,17 @@ def test_off_subject_evidence_is_rejected():
     assert not decision.passed
     assert decision.final_answer == "Paris"
     assert not decision.checks["subject_grounded_in_cited_doc"]
+
+
+def test_generic_branch_treats_missing_entity_check_as_not_applicable():
+    passages = [Passage("Autun", "The answer is Autun.")]
+    decision = decide(
+        direct_answer="Paris",
+        subject="",
+        entity="",
+        record=_record(supporting_doc_ids=(1,)),
+        passages=passages,
+    )
+    assert decision.passed
+    assert decision.final_answer == "Autun"
+    assert decision.checks["subject_grounded_in_cited_doc"]

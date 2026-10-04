@@ -8,6 +8,8 @@ model:
 retrieval:
   elasticsearch_url_env: ELASTICSEARCH_URL
   index_env: UER_RAG_INDEX
+  elasticsearch_username_env: ELASTICSEARCH_USERNAME
+  elasticsearch_password_env: ELASTICSEARCH_PASSWORD
   title_field: title
   text_field: text
   retrieve_k: 50
@@ -22,4 +24,3 @@ verification:
 
 run:
   allow_rescue: true
-  flush_every: 1

@@ -128,9 +128,9 @@ class CompatibleChatClient:
             for index, passage in enumerate(passages, start=1)
         )
         user = f"""Question: {question}
-Target subject: {subject or '[not supplied]'}
-Target relation: {relation or '[not supplied]'}
-Untrusted direct answer: {direct_answer or '[empty]'}
+Target subject: {subject or "[not supplied]"}
+Target relation: {relation or "[not supplied]"}
+Untrusted direct answer: {direct_answer or "[empty]"}
 
 Retrieved evidence:
 {evidence}
@@ -169,9 +169,7 @@ return an empty evidence_answer for missing, conflicting, off-subject, or relati
             return EvidenceRecord(
                 evidence_answer=str(value.get("evidence_answer", "")).strip(),
                 support_level=str(value.get("support_level", "none")).strip().lower(),
-                evidence_utility=str(value.get("evidence_utility", "insufficient"))
-                .strip()
-                .lower(),
+                evidence_utility=str(value.get("evidence_utility", "insufficient")).strip().lower(),
                 supporting_doc_ids=doc_ids,
                 reason=str(value.get("reason", ""))[:max_reason_chars],
                 json_valid=True,

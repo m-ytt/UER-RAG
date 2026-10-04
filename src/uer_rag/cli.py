@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from .io import append_jsonl, completed_qids, read_jsonl
+from .io import append_jsonl, completed_qids, latest_rows_by_qid, read_jsonl
 from .metrics import summarize_paired
 from .pipeline import Pipeline
 from .retrieval import ElasticsearchRetriever
@@ -30,7 +30,8 @@ def run_command(args: argparse.Namespace) -> int:
     retrieval_config = config.get("retrieval", {})
     verification_config = config.get("verification", {})
     run_config = config.get("run", {})
-    if not all(isinstance(item, dict) for item in [model_config, retrieval_config, verification_config, run_config]):
+    sections = [model_config, retrieval_config, verification_config, run_config]
+    if not all(isinstance(item, dict) for item in sections):
         raise ValueError("model, retrieval, verification, and run must be mappings")
 
     pipeline = Pipeline(
@@ -43,14 +44,17 @@ def run_command(args: argparse.Namespace) -> int:
     done = completed_qids(args.output)
     processed = skipped = failed = 0
     for row in read_jsonl(args.input):
-        qid = str(row.get("qid", ""))
+        qid = str(row.get("qid", "")).strip()
+        question = str(row.get("question", "")).strip()
+        if not qid or not question:
+            raise ValueError("Every input row requires non-empty qid and question")
         if qid in done:
             skipped += 1
             continue
         try:
             result = pipeline.run_one(row)
-        # A batch runner must preserve any per-example transport, parsing, or
-        # retrieval failure in JSONL so the qid can be audited and retried.
+        # Preserve transport, parsing, and retrieval failures in the append-only
+        # log so each qid remains auditable and retryable.
         except Exception as exc:  # noqa: BLE001
             result = {
                 **row,
@@ -61,7 +65,8 @@ def run_command(args: argparse.Namespace) -> int:
             }
             failed += 1
         append_jsonl(args.output, [result])
-        done.add(qid)
+        if not result.get("call_error") and not result.get("interrupted"):
+            done.add(qid)
         processed += 1
         if args.limit and processed >= args.limit:
             break
@@ -70,12 +75,25 @@ def run_command(args: argparse.Namespace) -> int:
 
 
 def evaluate_command(args: argparse.Namespace) -> int:
-    rows = list(read_jsonl(args.prediction))
+    rows, superseded = latest_rows_by_qid(read_jsonl(args.prediction))
+    incomplete = [
+        str(row.get("qid", "")) for row in rows if row.get("call_error") or row.get("interrupted")
+    ]
+    if incomplete and not args.allow_incomplete:
+        preview = ", ".join(incomplete[:5])
+        raise ValueError(
+            f"Refusing to score {len(incomplete)} incomplete qids"
+            f" ({preview}). Re-run the pipeline or pass --allow-incomplete explicitly."
+        )
     if args.reference:
-        references = {
-            str(row["qid"]): list(row.get("gold_answers") or [])
-            for row in read_jsonl(args.reference)
-        }
+        references = {}
+        for row in read_jsonl(args.reference):
+            qid = str(row.get("qid", "")).strip()
+            if not qid:
+                raise ValueError("Every reference row requires a non-empty qid")
+            if qid in references:
+                raise ValueError(f"Duplicate reference qid: {qid}")
+            references[qid] = list(row.get("gold_answers") or [])
         missing = []
         for row in rows:
             qid = str(row.get("qid", ""))
@@ -94,7 +112,14 @@ def evaluate_command(args: argparse.Namespace) -> int:
         direct_field=args.direct_field,
         final_field=args.prediction_field,
     )
-    print(json.dumps(summary.to_dict(), ensure_ascii=False, indent=2))
+    result = summary.to_dict()
+    result["evaluation_audit"] = {
+        "unique_qids": len(rows),
+        "superseded_retry_rows": superseded,
+        "incomplete_qids": len(incomplete),
+        "incomplete_included": bool(incomplete and args.allow_incomplete),
+    }
+    print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -114,6 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--reference")
     evaluate.add_argument("--prediction-field", default="final_answer")
     evaluate.add_argument("--direct-field", default="direct_answer")
+    evaluate.add_argument(
+        "--allow-incomplete",
+        action="store_true",
+        help="Explicitly include latest call_error/interrupted rows in scoring",
+    )
     evaluate.set_defaults(func=evaluate_command)
     return parser
 

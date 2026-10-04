@@ -1,4 +1,11 @@
 {
+  "schema_version": 1,
+  "code_version": "1.2.0",
+  "metric_definition": {
+    "em": "normalized exact match against any gold alias",
+    "accuracy": "normalized complete-word-boundary answer containment against any gold alias",
+    "f1": "maximum normalized token F1 over all gold aliases"
+  },
   "popqa_complete_14267": {
     "direct": {
       "em": 0.3812294105277914,
@@ -33,7 +40,12 @@
       "accuracy": 0.6859877892515264,
       "f1": 0.7031143995214512
     },
-    "accuracy_gain": 0.28393758950780135,
+    "paired_gain": {
+      "em": 0.2519785935026758,
+      "accuracy": 0.28393758950780135,
+      "f1": 0.2740689711091734
+    },
+    "f1_gain_95ci": [0.2666, 0.2815],
     "improved": 4210,
     "harmed": 140,
     "unchanged": 8917,
@@ -53,5 +65,12 @@
     "unchanged": 3979,
     "harm_rate": 0.0276
   },
-  "bootstrap": {"paired_resamples": 20000, "seed": 20260730}
+  "bootstrap": {"paired_resamples": 20000, "seed": 20260730},
+  "provenance": {
+    "status": "frozen manuscript aggregates",
+    "generator_scope": "All reported neural generations use one fixed generator; no cross-model result is claimed.",
+    "raw_predictions_distributed": false,
+    "reason": "Retrieved corpus text and provider outputs are excluded from the public release.",
+    "recomputation": "Use scripts/recompute_statistics.py with authorized prediction and reference JSONL files."
+  }
 }

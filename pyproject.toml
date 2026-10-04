@@ -4,16 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "uer-rag"
-version = "1.0.0"
+version = "1.2.0"
 description = "Risk-controlled answer replacement for long-tail entity QA"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
-authors = [{name = "Anonymous UER-RAG Authors"}]
+authors = [{name = "m-ytt"}]
 dependencies = [
   "requests>=2.31",
   "PyYAML>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/m-ytt/UER-RAG"
+Repository = "https://github.com/m-ytt/UER-RAG"
+Issues = "https://github.com/m-ytt/UER-RAG/issues"
 
 [project.optional-dependencies]
 dev = [

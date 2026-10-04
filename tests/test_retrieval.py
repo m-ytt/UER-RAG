@@ -1,4 +1,4 @@
-from uer_rag.retrieval import Passage, build_queries, reciprocal_rank_fusion
+from uer_rag.retrieval import Passage, build_queries, dual_retrieve, reciprocal_rank_fusion
 
 
 def test_queries_do_not_use_dataset_name():
@@ -25,3 +25,19 @@ def test_rrf_rewards_passages_found_by_both_queries():
     )
     assert result[0].title == "Louis Renault"
     assert result[0].query_sources == ("answer_conditioned", "answer_free")
+
+
+def test_empty_direct_answer_does_not_repeat_the_same_retrieval():
+    class Recorder:
+        def __init__(self):
+            self.queries = []
+
+        def search(self, query, size):
+            self.queries.append((query, size))
+            return [Passage("Title", "Text")]
+
+    retriever = Recorder()
+    (q0, q1), _passages = dual_retrieve(retriever, {"question": "Who is X?"}, "")
+    assert q0 == "Who is X?"
+    assert q1 is None
+    assert retriever.queries == [("Who is X?", 50)]

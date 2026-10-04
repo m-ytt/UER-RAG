@@ -26,7 +26,13 @@ def _cited(passages: Sequence[Passage], ids: Sequence[int]) -> list[Passage]:
 
 
 def _grounded(value: str, passages: Sequence[Passage]) -> bool:
-    return bool(value and any(contains_complete_words(f"{p.title} {p.text}", value) for p in passages))
+    return bool(
+        value
+        and any(
+            contains_complete_words(f"{passage.title} {passage.text}", value)
+            for passage in passages
+        )
+    )
 
 
 def decide(
@@ -41,12 +47,16 @@ def decide(
 ) -> GateDecision:
     cited = _cited(passages, record.supporting_doc_ids)
     target = subject or entity
+    # Entity grounding is mandatory when observable entity metadata exists.
+    # In the documented generic branch no such field is supplied, so this
+    # check is not applicable rather than an automatic permanent rejection.
+    target_grounded = not normalize_answer(target) or _grounded(target, cited)
     checks = {
         "nonempty_answer": bool(normalize_answer(record.evidence_answer)),
         "utility_helpful": record.evidence_utility == utility_required,
         "support_high_or_medium": record.support_level in set(support_allowed),
         "answer_grounded_in_cited_doc": _grounded(record.evidence_answer, cited),
-        "subject_grounded_in_cited_doc": _grounded(target, cited),
+        "subject_grounded_in_cited_doc": target_grounded,
         "different_from_direct": (
             bool(normalize_answer(record.evidence_answer))
             and normalize_answer(record.evidence_answer) != normalize_answer(direct_answer)

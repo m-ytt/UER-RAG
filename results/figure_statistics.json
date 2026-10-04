@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "metric_order": ["EM", "Accuracy", "Token F1"],
+  "method_order": ["Direct", "Always Evidence", "Prior Reference", "UER-RAG"],
+  "benchmarks": {
+    "popqa_complete_14267": [
+      [38.12, 40.30, 42.77],
+      [57.95, 66.36, 65.56],
+      [61.23, 68.54, 69.52],
+      [63.01, 68.31, 69.82]
+    ],
+    "entityquestions_test_5000": [
+      [38.08, 42.74, 48.07],
+      [40.34, 50.10, 51.59],
+      [47.16, 55.96, 59.51],
+      [47.58, 55.68, 59.57]
+    ]
+  },
+  "paired_gain_intervals_pp": {
+    "order": ["PopQA EM", "PopQA Accuracy", "PopQA F1", "EntityQuestions EM", "EntityQuestions Accuracy", "EntityQuestions F1"],
+    "mean": [24.88, 28.02, 27.05, 9.50, 12.94, 11.50],
+    "low": [24.15, 27.25, 26.33, 8.56, 11.88, 10.59],
+    "high": [25.62, 28.78, 27.77, 10.46, 14.00, 12.45]
+  },
+  "popqa_harm_rate_pct": [0.00, 9.61, 3.71, 1.07],
+  "outcome_composition_pct": [
+    [31.28, 1.07, 67.65],
+    [17.66, 2.76, 79.58]
+  ],
+  "evidence_utility_pct": [
+    [43.05, 34.13, 22.60, 0.22],
+    [31.26, 39.00, 29.58, 0.16]
+  ],
+  "em_transitions": {
+    "popqa_complete_14267": [[5179, 3649], [99, 5340]],
+    "entityquestions_test_5000": [[2541, 555], [80, 1824]]
+  },
+  "popqa_split_sensitivity": {
+    "labels": [
+      "Complete · EM",
+      "Complete · Accuracy",
+      "Complete · F1",
+      "Disjoint · EM",
+      "Disjoint · Accuracy",
+      "Disjoint · F1"
+    ],
+    "direct_pct": [38.12, 40.30, 42.77, 38.08, 40.21, 42.90],
+    "uer_rag_pct": [63.01, 68.31, 69.82, 63.28, 68.60, 70.31],
+    "harm_rate_pct": [1.07, 1.06]
+  },
+  "provenance": {
+    "core_metrics": "Frozen aggregate statistics reported in the manuscript; recompute from authorized raw JSONL with scripts/recompute_statistics.py.",
+    "relation_results": "analysis/data/relation_results.csv",
+    "split_sensitivity_note": "Complete PopQA includes 1,000 development examples; the 13,267-example result excludes them. Both are offline recomputations from frozen predictions."
+  }
+}

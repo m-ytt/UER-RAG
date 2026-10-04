@@ -31,13 +31,25 @@ class Retriever(Protocol):
     def search(self, query: str, size: int) -> list[Passage]: ...
 
 
-def build_queries(row: Mapping[str, object], direct_answer: str) -> tuple[str, str]:
+def build_queries(row: Mapping[str, object], direct_answer: str) -> tuple[str, str | None]:
+    """Build the answer-free query and, when useful, one conditioned query.
+
+    The direct answer is an untrusted lexical cue.  An empty or duplicate
+    conditioned query is omitted so the runner never executes the same search
+    twice while claiming to have two independent retrieval views.
+    """
+
     question = row.get("question", "")
     entity = row.get("entity") or row.get("entity_title") or row.get("s_wiki_title")
     subject = row.get("subject") or row.get("subj")
     relation = row.get("relation") or row.get("property") or row.get("prop")
     q0 = join_observable_fields(question, entity, subject, relation)
-    q1 = join_observable_fields(q0, direct_answer)
+    candidate = join_observable_fields(q0, direct_answer)
+    q1 = (
+        candidate
+        if direct_answer.strip() and normalize_answer(candidate) != normalize_answer(q0)
+        else None
+    )
     return q0, q1
 
 
@@ -82,12 +94,14 @@ class ElasticsearchRetriever:
         title_field: str = "title",
         text_field: str = "text",
         timeout_seconds: float = 60,
+        auth: tuple[str, str] | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.index = index
         self.title_field = title_field
         self.text_field = text_field
         self.timeout_seconds = timeout_seconds
+        self.auth = auth
 
     @classmethod
     def from_config(cls, config: Mapping[str, object]) -> ElasticsearchRetriever:
@@ -97,12 +111,17 @@ class ElasticsearchRetriever:
         index = os.environ.get(index_env, "")
         if not base_url or not index:
             raise RuntimeError(f"Set {url_env} and {index_env} before running retrieval")
+        username_env = str(config.get("elasticsearch_username_env", "ELASTICSEARCH_USERNAME"))
+        password_env = str(config.get("elasticsearch_password_env", "ELASTICSEARCH_PASSWORD"))
+        username = os.environ.get(username_env, "")
+        password = os.environ.get(password_env, "")
         return cls(
             base_url=base_url,
             index=index,
             title_field=str(config.get("title_field", "title")),
             text_field=str(config.get("text_field", "text")),
             timeout_seconds=float(config.get("request_timeout_seconds", 60)),
+            auth=(username, password) if username else None,
         )
 
     def search(self, query: str, size: int) -> list[Passage]:
@@ -121,6 +140,7 @@ class ElasticsearchRetriever:
             f"{self.base_url}/{self.index}/_search",
             json=payload,
             timeout=self.timeout_seconds,
+            auth=self.auth,
         )
         response.raise_for_status()
         hits = response.json().get("hits", {}).get("hits", [])
@@ -146,10 +166,9 @@ def dual_retrieve(
     retrieve_k: int = 50,
     top_k: int = 3,
     rrf_k: int = 20,
-) -> tuple[tuple[str, str], list[Passage]]:
+) -> tuple[tuple[str, str | None], list[Passage]]:
     q0, q1 = build_queries(row, direct_answer)
-    rankings = {
-        "answer_free": retriever.search(q0, retrieve_k),
-        "answer_conditioned": retriever.search(q1, retrieve_k),
-    }
+    rankings: dict[str, list[Passage]] = {"answer_free": retriever.search(q0, retrieve_k)}
+    if q1 is not None:
+        rankings["answer_conditioned"] = retriever.search(q1, retrieve_k)
     return (q0, q1), reciprocal_rank_fusion(rankings, k=rrf_k, top_k=top_k)

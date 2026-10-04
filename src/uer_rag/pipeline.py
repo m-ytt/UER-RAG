@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from .gate import decide
+from .postaudit import post_audit
 from .retrieval import ElasticsearchRetriever, dual_retrieve
 from .verifier import CompatibleChatClient
 
@@ -41,9 +42,8 @@ class Pipeline:
         entity = str(
             row.get("entity") or row.get("entity_title") or row.get("s_wiki_title") or ""
         ).strip()
-        relation = str(
-            row.get("relation") or row.get("property") or row.get("prop") or ""
-        ).strip()
+        relation = str(row.get("relation") or row.get("property") or row.get("prop") or "").strip()
+        method_branch = "entity_relation" if (entity or subject or relation) else "generic"
         record = self.client.verify(
             question=question,
             direct_answer=direct_answer,
@@ -60,9 +60,7 @@ class Pipeline:
             passages=passages,
             support_allowed=tuple(
                 str(value).lower()
-                for value in self.verification_config.get(
-                    "support_allowed", ["high", "medium"]
-                )
+                for value in self.verification_config.get("support_allowed", ["high", "medium"])
             ),
             utility_required=str(
                 self.verification_config.get("utility_required", "helpful")
@@ -79,6 +77,23 @@ class Pipeline:
                 final_answer = rescued
                 selected_source = "rescue"
 
+        audit = post_audit(
+            row=row,
+            question=question,
+            direct_answer=direct_answer,
+            proposed_answer=final_answer,
+            selected_source=selected_source,
+            record=record,
+            passages=passages,
+        )
+        final_answer = audit.final_answer
+        selected_source = audit.selected_source
+
+        query_kind = "entity_relation" if method_branch == "entity_relation" else "question"
+        variants = [{"kind": query_kind, "query": q0}]
+        if q1 is not None:
+            variants.append({"kind": f"{query_kind}_plus_direct", "query": q1})
+
         result = dict(row)
         result.update(
             {
@@ -87,11 +102,8 @@ class Pipeline:
                 "direct_answer": direct_answer,
                 "direct_reused": direct_reused,
                 "retrieval_query_info": {
-                    "query_variants": [
-                        {"kind": "entity_relation", "query": q0},
-                        {"kind": "entity_relation_plus_direct", "query": q1},
-                    ],
-                    "direct_answer_conditioned_retrieval": True,
+                    "query_variants": variants,
+                    "direct_answer_conditioned_retrieval": q1 is not None,
                     "rrf_k": int(self.retrieval_config.get("rrf_k", 20)),
                     "dataset_conditioned_branch": False,
                 },
@@ -103,9 +115,18 @@ class Pipeline:
                     "final_answer": final_answer,
                     "dataset_conditioned": False,
                 },
+                "post_audit": audit.to_dict(),
+                "pre_guard_answer": audit.pre_safety_answer,
+                "pre_relation_guard_answer": audit.pre_relation_answer,
+                "pre_short_answer": audit.pre_canonical_answer,
+                "safety_guard_applied": audit.safety_guard_applied,
+                "safety_guard_reason": audit.safety_guard_reason,
+                "relation_guard_applied": audit.relation_guard_applied,
+                "relation_guard_reason": audit.relation_guard_reason,
+                "short_answer_applied": audit.short_answer_applied,
                 "final_answer": final_answer,
                 "rescue_triggered": rescue_triggered,
-                "method_branch": "entity_relation" if (entity or subject or relation) else "generic",
+                "method_branch": method_branch,
                 "dataset_conditioned_branch": False,
                 "model_id": self.client.model,
             }

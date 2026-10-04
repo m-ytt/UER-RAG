@@ -19,10 +19,29 @@ def read_jsonl(path: str | Path) -> Iterator[dict[str, object]]:
 
 
 def completed_qids(path: str | Path) -> set[str]:
+    """Return qids whose latest append-only record is successful."""
+
     target = Path(path)
     if not target.exists():
         return set()
-    return {str(row["qid"]) for row in read_jsonl(target) if "qid" in row}
+    rows, _superseded = latest_rows_by_qid(read_jsonl(target))
+    return {
+        str(row["qid"]) for row in rows if not row.get("call_error") and not row.get("interrupted")
+    }
+
+
+def latest_rows_by_qid(rows: Iterable[Mapping[str, object]]) -> tuple[list[dict[str, object]], int]:
+    """Collapse an append-only retry log to the latest row for every qid."""
+
+    latest: dict[str, dict[str, object]] = {}
+    count = 0
+    for row in rows:
+        qid = str(row.get("qid", "")).strip()
+        if not qid:
+            raise ValueError("Every prediction row requires a non-empty qid")
+        latest[qid] = dict(row)
+        count += 1
+    return list(latest.values()), count - len(latest)
 
 
 def append_jsonl(path: str | Path, rows: Iterable[Mapping[str, object]]) -> None:
